@@ -50,41 +50,63 @@ showRE' re
 
 lookUp :: Eq a => a -> [(a, b)] -> b
 --Pre: There is exactly one occurrence of the item being looked up.
-lookUp 
-  = undefined
+lookUp k
+  = fromJust . lookup k
 
 simplify :: RE -> RE
-simplify
-  = undefined
+simplify (Plus re)
+  = Seq (simplify re) (Rep (simplify re))
+simplify (Opt re)
+  = Alt (simplify re) Null
+simplify (Rep re)
+  = Rep (simplify re)
+simplify (Alt re re')
+  = Alt (simplify re) (simplify re')
+simplify (Seq re re')
+  = Seq (simplify re) (simplify re')
+simplify re
+  = re
 
 --------------------------------------------------------
 -- Part II
 
 startState :: Automaton -> State
-startState
-  = undefined
+startState (s, _, _)
+  = s
 terminalStates :: Automaton -> [State]
-terminalStates
-  = undefined
+terminalStates (_, t, _)
+  = t
 transitions :: Automaton -> [Transition]
-transitions 
-  = undefined
+transitions (_, _, t)
+  = t
 
 isTerminal :: State -> Automaton -> Bool
-isTerminal 
-  = undefined
+isTerminal s a
+  = s `elem` terminalStates a
 
 transitionsFrom :: State -> Automaton -> [Transition]
-transitionsFrom
-  = undefined
+transitionsFrom s a
+  = [t | t@(s', _, _) <- transitions a, s == s']
 
 labels :: [Transition] -> [Label]
-labels 
-  = undefined
+labels ts
+  = nub [l | (_, _, l) <- ts, l /= Eps]
 
 accepts :: Automaton -> String -> Bool
-accepts 
-  = undefined
+accepts a s
+  = accepts' (startState a) s
+  where accepts' :: State -> String -> Bool
+        accepts' s str
+          | isTerminal s a && null str = True
+          | otherwise                  = any (try str) (transitionsFrom s a)
+        try :: String -> Transition -> Bool
+        try str (_, t, Eps)
+          = accepts' t str
+        try [] (_, _, C _)
+          = False
+        try (c':cs) (_, t, C c)
+          | c == c'   = accepts' t cs
+          | otherwise = False
 
 --------------------------------------------------------
 -- Part III
@@ -96,8 +118,21 @@ makeNDA re
     (transitions, k) = make (simplify re) 1 2 3
 
 make :: RE -> Int -> Int -> Int -> ([Transition], Int)
-make 
-  = undefined
+make Null m n k
+  = ([(m, n, Eps)], k)
+make (Term c) m n k
+  = ([(m, n, C c)], k)
+make (Seq re re') m n k
+  = (t ++ (k, k + 1, Eps) : t', k'')
+  where (t, k')  = make re m k (k + 2)
+        (t', k'') = make re' (k + 1) n k'
+make (Alt re re') m n k
+  = (t ++ (m, k, Eps): (m, k + 2, Eps): (k + 1, n, Eps): (k + 3, n, Eps): t', k'')
+  where (t, k') = make re k (k + 1) (k + 4)
+        (t', k'') = make re' (k + 2) (k + 3) k'
+make (Rep re) m n k
+  = ((m, k, Eps): (m, n, Eps): (k + 1, k, Eps): t, k')
+  where (t, k') = make re k (k + 1) (k + 2)
 
 --------------------------------------------------------
 -- Part IV
@@ -107,17 +142,32 @@ type MetaState = [State]
 type MetaTransition = (MetaState, MetaState, Label)
 
 getFrontier :: State -> Automaton -> [Transition]
-getFrontier
-  = undefined
+getFrontier s a
+  = concatMap getFrontier' (transitionsFrom s a)
+  where getFrontier' :: Transition -> [Transition]
+        getFrontier' (_, t, Eps)
+          | isTerminal t a = [(t, t, Eps)]
+          | otherwise      = concatMap getFrontier' (transitionsFrom t a)
+        getFrontier' t
+          = [t]
 
 groupTransitions :: [Transition] -> [(Label, [State])]
-groupTransitions
-  = undefined
+groupTransitions ts
+  = map (\l -> (l, [e | (_, e, l') <- ts, l' == l])) (labels ts)
 
 makeDA :: Automaton -> Automaton
 -- Pre: Any cycle in the NDA must include at least one non-Eps transition
-makeDA 
-  = undefined
+makeDA a@(s, es, _)
+  = (s, map (`lookUp` mp) (filter (any (`elem` es)) ms), [(lookUp ms' mp, lookUp ms'' mp, l) | (ms', ms'', l) <- ts])
+  where (m, ms, ts) = makeDA' [s] [] []
+        mp = zip ms [1..]
+        makeDA' :: [State] -> [MetaState] -> [MetaTransition]
+                -> (MetaState, [MetaState], [MetaTransition])
+        makeDA' ss ms ts
+          | m `elem` ms = (ss, ms, ts)
+          | otherwise   = foldr (\(l, ss) (r, ms, ts) -> let (r, ms', ts') = makeDA' ss ms ts in (r, m : ms, (m, r, l) : ts')) (ss, ms, ts) (groupTransitions fs)
+          where m = (sort . nub) [s' | (s', _, _) <- fs]
+                fs = concatMap (`getFrontier` a) ss
 
 --------------------------------------------------------
 -- Test cases
