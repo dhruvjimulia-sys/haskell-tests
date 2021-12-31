@@ -60,7 +60,7 @@ getAttribute _ _
 getChildren :: String -> XML -> [XML]
 getChildren s (Element _ _ cs)
   = [c | c <- cs, case c of
-    (Element n _ _) -> n == s
+    (Element s _ _) -> True
     _ -> False]
 getChildren _ _
   = []
@@ -80,7 +80,7 @@ getValue :: XML -> XML
 getValue (Text s)
   = Text s
 getValue (Element _ _ cs)
-  = Text (foldr ((\(Text [c]) a -> c : a) . getValue) [] cs)
+  = Text (foldr ((\(Text c) a -> c ++ a) . getValue) [] cs)
 
 -------------------------------------------------------------------------
 -- Part II
@@ -163,15 +163,29 @@ expandXSL xsl source
     root = Element "/" [] [source]
 
 expandXSL' :: Context -> XSL -> [XML]
-expandXSL' c x | trace (show c ++ "\n" ++ show x ++ "\n") False = undefined
-expandXSL' (Element p [] xml) (Element "value-of" [("select", xs)] [])
-  | all (\x -> getChild b x == Text "") xml = [Text ""]
-  | otherwise                               = expandXSL' (Element (p ++ b ++ "/") [] [getChild b xml]) (Element "value-of" [("select", tail a)] [])
-  where (b, a) = span (/='/') xs
--- expandXSL' (Element p [] [xml]) (Element "for-each" [("select", x)] [])
---  = undefined
--- expandXSL' (Element p [] [xml]) (Element x)
-
+-- expandXSL' c x | trace (show c ++ "\n" ++ show x) False = undefined
+expandXSL' xml@(Element c as cs) (Element "for-each" [("select", xs)] fc)
+  | null a    = concatMap (`expandXSL'` fc) chs
+  | null chs  = [Text ""]
+  | otherwise = concatMap (\(Element _ as' cs') -> expandXSL' (Element (c ++ b ++ "/") as' cs') (Element "for-each" [("select", tail a)] fc)) chs
+  where chs     = getChildren b xml
+        (b, a) = span (/='/') xs
+expandXSL' xml@(Element c as cs) (Element "value-of" [("select", '@':xs)] []) 
+  = [maybe (Text "") Text (lookup xs as)]
+expandXSL' xml@(Element c as cs) (Element "value-of" [("select", xs)] []) 
+  | null a && b == "." = [getValue xml] 
+  | b == "."           = expandXSL' (Element (c ++ b ++ "/") as cs) (Element "value-of" [("select", tail a)] [])
+  | null a             = [getValue ch]
+  | ch == Text ""      = [Text ""]
+  | otherwise          = expandXSL' (Element (c ++ b ++ "/") as' cs') (Element "value-of" [("select", tail a)] []) 
+  where Element _ as' cs' = ch
+        ch     = getChild b xml
+        (b, a) = span (/='/') xs
+expandXSL' xml xsl@(Element n as' cs')
+  = map (Element n as') (map (expandXSL' xml) cs')
+expandXSL' xml (Text s)
+  = [Text s]
+  
 -------------------------------------------------------------------------
 -- Test data for Parts I and II
 
