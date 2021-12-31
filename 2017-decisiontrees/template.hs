@@ -14,7 +14,7 @@ type Row = [AttValue]
 type DataSet = (Header, [Row])
 
 data DecisionTree = Null |
-                    Leaf AttValue | 
+                    Leaf AttValue |
                     Node AttName [(AttValue, DecisionTree)]
                   deriving (Eq, Show)
 
@@ -25,13 +25,13 @@ type AttSelector = DataSet -> Attribute -> Attribute
 xlogx :: Double -> Double
 xlogx p
   | p <= 1e-100 = 0.0
-  | otherwise   = p * log2 p 
+  | otherwise   = p * log2 p
   where
     log2 x = log x / log 2
 
 lookUp :: (Eq a, Show a, Show b) => a -> [(a, b)] -> b
 lookUp x table
-  = fromMaybe (error ("lookUp error - no binding for " ++ show x ++ 
+  = fromMaybe (error ("lookUp error - no binding for " ++ show x ++
                       " in table: " ++ show table))
               (lookup x table)
 
@@ -40,42 +40,51 @@ lookUp x table
 --------------------------------------------------------------------
 
 allSame :: Eq a => [a] -> Bool
-allSame 
-  = undefined
+allSame xs
+  = and $ zipWith (==) xs (tail xs)
 
 remove :: Eq a => a -> [(a, b)] -> [(a, b)]
-remove 
-  = undefined
+remove k
+  = filter (\p -> fst p /= k)
 
 lookUpAtt :: AttName -> Header -> Row -> AttValue
 --Pre: The attribute name is present in the given header.
-lookUpAtt
-  = undefined
+lookUpAtt a h r
+  = r !! fromJust (elemIndex a (map fst h))
 
 removeAtt :: AttName -> Header -> Row -> Row
-removeAtt
-  = undefined
+removeAtt a h r
+  = map snd $ filter (\(i, _) -> i /= fromJust (elemIndex a (map fst h))) (zip [0..] r)
 
 addToMapping :: Eq a => (a, b) -> [(a, [b])] -> [(a, [b])]
-addToMapping
-  = undefined
+addToMapping (x, v) m
+  | x `elem` map fst m = (x, v : fromJust (lookup x m)) : remove x m
+  | otherwise          = (x, [v]) : m
 
 buildFrequencyTable :: Attribute -> DataSet -> [(AttValue, Int)]
 --Pre: Each row of the data set contains an instance of the attribute
-buildFrequencyTable
-  = undefined
+buildFrequencyTable (n, vs) (h, rs)
+  = map (\(k, v) -> (k, length v)) (foldr addToMapping (zip vs (repeat [])) (zip (map (lookUpAtt n h) rs) [1..]))
 
 --------------------------------------------------------------------
 -- PART II
 --------------------------------------------------------------------
 
 nodes :: DecisionTree -> Int
-nodes 
-  = undefined
+nodes Null
+  = 0
+nodes (Leaf _)
+  = 1
+nodes (Node _ ts)
+  = 1 + sum (map (nodes . snd) ts)
 
 evalTree :: DecisionTree -> Header -> Row -> AttValue
-evalTree 
-  = undefined
+evalTree Null _ _
+  = ""
+evalTree (Leaf v) _ _
+  = v
+evalTree (Node n ts) h r
+  = evalTree (lookUp (lookUpAtt n h r) ts) h r
 
 --------------------------------------------------------------------
 -- PART III
@@ -93,48 +102,68 @@ nextAtt (header, _) (classifierName, _)
   = head (filter ((/= classifierName) . fst) header)
 
 partitionData :: DataSet -> Attribute -> Partition
-partitionData 
-  = undefined
+partitionData (h, rs) (n, vs)
+  = map (\v -> (v, (remove n h, map (removeAtt n h) (filter (\r -> lookUpAtt n h r == v) rs)))) vs
 
-buildTree :: DataSet -> Attribute -> AttSelector -> DecisionTree 
-buildTree 
-  = undefined
+buildTree :: DataSet -> Attribute -> AttSelector -> DecisionTree
+buildTree (_, []) _ _
+  = Null
+buildTree d@(h, rs) ca s
+  | allSame (map (lookUpAtt (fst ca) h) rs) = Leaf (lookUpAtt (fst ca) h (head rs))
+  | otherwise             = Node pn (map (\(v, ds) -> (v, buildTree ds ca s)) (partitionData d pa))
+  where pa@(pn, _) = s d ca
 
 --------------------------------------------------------------------
 -- PART IV
 --------------------------------------------------------------------
 
+{-
+remove :: Eq a => a -> [(a, b)] -> [(a, b)]
+lookUpAtt :: AttName -> Header -> Row -> AttValue
+removeAtt :: AttName -> Header -> Row -> Row
+addToMapping :: Eq a => (a, b) -> [(a, [b])] -> [(a, [b])]
+type Partition = [(AttValue, DataSet)]
+type Attribute = (AttName, [AttValue])
+type Header = [Attribute]
+type Row = [AttValue]
+type DataSet = (Header, [Row])
+data DecisionTree = Null |
+                    Leaf AttValue |
+                    Node AttName [(AttValue, DecisionTree)]
+                  deriving (Eq, Show)
+type Partition = [(AttValue, DataSet)]
+-}
 entropy :: DataSet -> Attribute -> Double
-entropy 
+entropy
   = undefined
 
 gain :: DataSet -> Attribute -> Attribute -> Double
-gain 
+gain
   = undefined
 
 bestGainAtt :: AttSelector
-bestGainAtt 
+bestGainAtt
   = undefined
 
 --------------------------------------------------------------------
 
 outlook :: Attribute
-outlook 
+outlook
   = ("outlook", ["sunny", "overcast", "rainy"])
 
-temp :: Attribute 
-temp 
+temp :: Attribute
+temp
   = ("temp", ["hot", "mild", "cool"])
 
-humidity :: Attribute 
-humidity 
+humidity :: Attribute
+humidity
   = ("humidity", ["high", "normal"])
 
-wind :: Attribute 
-wind 
+wind :: Attribute
+wind
   = ("wind", ["windy", "calm"])
 
-result :: Attribute 
+result :: Attribute
 result
   = ("result", ["good", "bad"])
 
@@ -144,9 +173,9 @@ fishingData
 
 header :: Header
 table  :: [Row]
-header 
-  =  [outlook,    temp,   humidity, wind,    result] 
-table 
+header
+  =  [outlook,    temp,   humidity, wind,    result]
+table
   = [["sunny",    "hot",  "high",   "calm",  "bad" ],
      ["sunny",    "hot",  "high",   "windy", "bad" ],
      ["overcast", "hot",  "high",   "calm",  "good"],
@@ -172,9 +201,9 @@ fishingData'
 
 header' :: Header
 table'  :: [Row]
-header' 
-  =  [outlook,    result, temp,   humidity, wind] 
-table' 
+header'
+  =  [outlook,    result, temp,   humidity, wind]
+table'
   = [["sunny",    "bad",  "hot",  "high",   "calm"],
      ["sunny",    "bad",  "hot",  "high",   "windy"],
      ["overcast", "good", "hot",  "high",   "calm"],
@@ -192,35 +221,35 @@ table'
 
 fig1 :: DecisionTree
 fig1
-  = Node "outlook" 
-         [("sunny", Node "temp" 
+  = Node "outlook"
+         [("sunny", Node "temp"
                          [("hot", Leaf "bad"),
-                          ("mild",Node "humidity" 
+                          ("mild",Node "humidity"
                                        [("high",   Leaf "bad"),
                                         ("normal", Leaf "good")]),
                           ("cool", Leaf "good")]),
           ("overcast", Leaf "good"),
-          ("rainy", Node "temp" 
+          ("rainy", Node "temp"
                          [("hot", Null),
-                          ("mild", Node "humidity" 
-                                        [("high",Node "wind" 
+                          ("mild", Node "humidity"
+                                        [("high",Node "wind"
                                                       [("windy",  Leaf "bad"),
                                                        ("calm", Leaf "good")]),
                                          ("normal", Leaf "good")]),
-                          ("cool", Node "humidity" 
+                          ("cool", Node "humidity"
                                         [("high", Null),
-                                         ("normal", Node "wind" 
+                                         ("normal", Node "wind"
                                                          [("windy",  Leaf "bad"),
                                                           ("calm", Leaf "good")])])])]
 
 fig2 :: DecisionTree
 fig2
-  = Node "outlook" 
-         [("sunny", Node "humidity" 
+  = Node "outlook"
+         [("sunny", Node "humidity"
                          [("high", Leaf "bad"),
                           ("normal", Leaf "good")]),
           ("overcast", Leaf "good"),
-          ("rainy", Node "wind" 
+          ("rainy", Node "wind"
                          [("windy", Leaf "bad"),
                           ("calm", Leaf "good")])]
 
