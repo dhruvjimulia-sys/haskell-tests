@@ -134,16 +134,22 @@ data DecisionTree = Null |
 type Partition = [(AttValue, DataSet)]
 -}
 entropy :: DataSet -> Attribute -> Double
-entropy
-  = undefined
+entropy (_, []) a
+  = 0
+entropy ds@(_, rs) a
+  = sum (map (\(_, i) -> - xlogx (fromIntegral i / fromIntegral n)) (buildFrequencyTable a ds))
+  where n = length rs
+
+a = lookUpAtt
 
 gain :: DataSet -> Attribute -> Attribute -> Double
-gain
-  = undefined
-
+gain ds@(_, rs) a@(n, vs) ca
+  = entropy ds ca - sum (zipWith (\v@(_, i) (_, p) -> fromIntegral i / fromIntegral n * entropy p ca) (buildFrequencyTable a ds) (partitionData ds a))
+  where n = length rs
+--type AttSelector = DataSet -> Attribute -> Attribute
 bestGainAtt :: AttSelector
-bestGainAtt
-  = undefined
+bestGainAtt ds@(h, rs) ca@(n, vs)
+  = snd $ maximum $ map (\a -> (gain ds a ca, a)) (delete ca h)
 
 --------------------------------------------------------------------
 
