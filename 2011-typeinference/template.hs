@@ -49,21 +49,25 @@ primTypes
 
 -- Pre: The search item is in the table
 lookUp :: Eq a => a -> [(a, b)] -> b
-lookUp 
-  = undefined
+lookUp x
+  = tryToLookUp x undefined
 
 tryToLookUp :: Eq a => a -> b -> [(a, b)] -> b
-tryToLookUp 
-  = undefined
+tryToLookUp x d xs
+  = fromMaybe d (lookup x xs)
 
 -- Pre: The given value is in the table
 reverseLookUp :: Eq b => b -> [(a, b)] -> [a]
-reverseLookUp 
-  = undefined
+reverseLookUp x xs
+  = map fst $ filter (\(_, v) -> v == x) xs
 
 occurs :: String -> Type -> Bool
-occurs 
-  = undefined
+occurs v (TVar v')
+  = v == v'
+occurs v (TFun t t')
+  = occurs v t || occurs v t'
+occurs _ _
+  = False
 
 ------------------------------------------------------
 -- PART II
@@ -72,22 +76,61 @@ occurs
 -- Pre: All variables in the expression have a binding in the given 
 --      type environment
 inferType :: Expr -> TEnv -> Type
-inferType
-  = undefined
-
+inferType (Number _)  _
+  = TInt
+inferType (Boolean _)  _
+  = TBool
+inferType (Id s) t
+  = lookUp s t
+inferType (Prim p) _
+  = lookUp p primTypes
+inferType (Cond c e e') t
+  | inferType c t == TBool && inferType e t == inferType e' t = inferType e t
+  | otherwise                                           = TErr
+inferType (App e e') te
+  = inferType' (inferType e te) (inferType e' te)
+  where inferType' :: Type -> Type -> Type
+        inferType' (TFun t t') _
+          | t == inferType e' te = t'
+        inferType' _ _
+          = TErr
+inferType (Fun _ _) _
+  = undefined 
 ------------------------------------------------------
 -- PART III
-
-applySub
-  = undefined
+applySub :: Sub -> Type -> Type
+applySub s (TVar v)
+  = tryToLookUp v (TVar v) s
+applySub s (TFun t t')
+  = TFun (applySub s t) (applySub s t')
+applySub _ t
+  = t
 
 unify :: Type -> Type -> Maybe Sub
 unify t t'
   = unifyPairs [(t, t')] []
 
+
 unifyPairs :: [(Type, Type)] -> Sub -> Maybe Sub
-unifyPairs
-  = undefined
+unifyPairs [] s
+  = Just s
+unifyPairs ((TInt, TInt):ts) s
+  = unifyPairs ts s
+unifyPairs ((TBool, TBool):ts) s
+  = unifyPairs ts s
+unifyPairs ((TVar v, TVar v'):ts) s
+  | v == v'   = unifyPairs ts s
+  | otherwise = Nothing
+unifyPairs ((TVar v, t):ts) s
+  | occurs v t = Nothing
+  | otherwise  = unifyPairs (map (\(t', t'') -> (applySub [(v, t)] t', applySub [(v, t)] t'')) ts) ((v, t): s)
+unifyPairs ((t, TVar v):ts) s
+  | occurs v t = Nothing
+  | otherwise  = unifyPairs (map (\(t', t'') -> (applySub [(v, t)] t', applySub [(v, t)] t'')) ts) ((v, t): s)
+unifyPairs ((TFun t1 t2, TFun t1' t2'):ts) s
+  = unifyPairs ((t1, t1'): (t2, t2'): ts) s
+unifyPairs _ _
+  = Nothing
 
 ------------------------------------------------------
 -- PART IV
@@ -109,19 +152,21 @@ combineSubs
   = foldr1 combine
 
 inferPolyType :: Expr -> Type
-inferPolyType
-  = undefined
+inferPolyType e
+  = t
+  where (_, t, _) = inferPolyType' e [] (map (\c -> 'a':[c]) ['1'..])
 
--- You may optionally wish to use one of the following helper function declarations
--- as suggested in the specification. 
-
--- inferPolyType' :: Expr -> TEnv -> [String] -> (Sub, Type, [String])
--- inferPolyType'
---   = undefined
-
--- inferPolyType' :: Expr -> TEnv -> Int -> (Sub, Type, Int)
--- inferPolyType' 
---   = undefined
+inferPolyType' :: Expr -> TEnv -> [String] -> (Sub, Type, [String])
+inferPolyType' (Fun x e) en (s:ss)
+  | te == TErr = (en, TErr, ss')
+  | otherwise  = (en, TFun (applySub sb (TVar s)) te, ss)
+  where (sb, te, ss') = inferPolyType' e ((x, TVar s) : en) ss
+inferPolyType' (App f e) en (s:ss)
+  = maybe (en, TErr, ss'') (\us -> (combineSubs [us, sb', sb], applySub us (TVar s), ss'')) (unify tf (TFun te (TVar s)))
+  where (sb, tf, ss') = inferPolyType' f en ss
+        (sb', te, ss'') = inferPolyType' e (updateTEnv en sb) ss'
+inferPolyType' e en ss
+  = (en, inferType e en, ss)
 
 ------------------------------------------------------
 -- Monomorphic type inference test cases from Table 1...
@@ -211,4 +256,3 @@ type13 = TFun (TVar "a1") (TFun (TFun (TVar "a1") (TFun TInt (TVar "a3")))
 ex14 = Fun "x" (Fun "y" (App (Id "x") (Prim "+"))) 
 type14 = TFun (TFun (TFun TInt (TFun TInt TInt)) (TVar "a3")) 
               (TFun (TVar "a2") (TVar "a3"))
-
