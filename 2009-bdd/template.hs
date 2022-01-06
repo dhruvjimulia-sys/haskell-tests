@@ -1,4 +1,7 @@
 import Data.List
+import Data.Maybe
+import Debug.Trace
+import Data.Tuple
 
 type Index = Int
 
@@ -18,27 +21,54 @@ type BDD = (NodeId, [BDDNode])
 
 -- Pre: The item is in the given table
 lookUp :: Eq a => a -> [(a, b)] -> b
-lookUp 
-  = undefined
+lookUp k
+  = fromJust . lookup k
 
 checkSat :: BDD -> Env -> Bool
-checkSat 
-  = undefined
+checkSat (r, ns) en
+  = checkSat' r
+  where checkSat' :: NodeId -> Bool
+        checkSat' ni
+          | lookUp nid en = if r < 2 then toEnum r else checkSat' r
+          | otherwise     = if l < 2 then toEnum l else checkSat' l
+          where (nid, l, r) = lookUp ni ns
 
 sat :: BDD -> [[(Index, Bool)]]
-sat 
-  = undefined
-
+sat (r, ns)
+  = sat' r
+  where sat' :: NodeId -> [[(Index, Bool)]]
+        -- sat' i | trace (show i ++ " ") False = undefined
+        sat' ni
+          | ni == 0   = []
+          | ni == 1   = [[]]
+          | otherwise = map ((nid, False):) (sat' l) ++ map ((nid, True):) (sat' r)
+          where (nid, l, r) = lookUp ni ns
+          
 ------------------------------------------------------
 -- PART II
 
 simplify :: BExp -> BExp
-simplify 
-  = undefined
+simplify (Not (Prim b))
+  = Prim (not b)
+simplify (Or (Prim b) (Prim b'))
+  = Prim (b || b')
+simplify (And (Prim b) (Prim b'))
+  = Prim (b && b')
+simplify e
+  = e
 
 restrict :: BExp -> Index -> Bool -> BExp
-restrict 
-  = undefined
+restrict (Not e) i b 
+  = simplify (Not (restrict e i b))
+restrict (Or e e') i b
+  = simplify (Or (restrict e i b) (restrict e' i b))
+restrict (And e e') i b
+  = simplify (And (restrict e i b) (restrict e' i b))
+restrict (IdRef i') i b
+  | i' == i   = Prim b
+  | otherwise = IdRef i'
+restrict b _ _ 
+  = b
 
 ------------------------------------------------------
 -- PART III
@@ -48,23 +78,87 @@ restrict
 -- The question suggests the following definition (in terms of buildBDD')
 -- but you are free to implement the function differently if you wish.
 buildBDD :: BExp -> [Index] -> BDD
-buildBDD 
-  = undefined
+buildBDD e
+  = buildBDD' e 2
 
 -- Potential helper function for buildBDD which you are free
 -- to define/modify/ignore/delete/embed as you see fit.
 buildBDD' :: BExp -> NodeId -> [Index] -> BDD
-buildBDD' 
-  = undefined
+buildBDD' (Prim False) _ []
+  = (0, [])
+buildBDD' (Prim True) _ []
+  = (1, [])
+buildBDD' e id (x:xs)
+  = (id, (id, (x, l, r)):lns ++ rns)
+  where (l, lns) = buildBDD' (restrict e x False) (2 * id) xs
+        (r, rns) = buildBDD' (restrict e x True) (2 * id + 1) xs 
 
+{-
+type Index = Int
+data BExp = Prim Bool | IdRef Index | Not BExp | And BExp BExp | Or BExp BExp
+            deriving (Eq, Ord, Show)
+type Env = [(Index, Bool)]
+type NodeId = Int
+type BDDNode =  (NodeId, (Index, NodeId, NodeId))
+type BDD = (NodeId, [BDDNode])
+-}
 ------------------------------------------------------
 -- PART IV
 
 -- Pre: Each variable index in the BExp appears exactly once
 --      in the Index list; there are no other elements
 buildROBDD :: BExp -> [Index] -> BDD
-buildROBDD 
+buildROBDD e xs
+  = buildROBDD' e 2 Nothing xs
+
+buildROBDD' :: BExp -> NodeId -> Maybe NodeId -> [Index] -> BDD
+-- buildROBDD' e nid pid [] xs | trace (show nid ++ " ") False = undefined
+buildROBDD' (Prim False) _ _ []
+  = (0, [])
+buildROBDD' (Prim True) _ _ []
+  = (1, [])
+buildROBDD' e id Nothing (x:xs)
+  = (id, (id, (x, l, r)):lns ++ rns)
+    where (l, lns) = buildROBDD' (restrict e x False) (2 * id) (Just id) xs
+          (r, rns) = buildROBDD' (restrict e x True) (2 * id + 1) (Just id) xs 
+buildROBDD' e id (Just pid) (x:xs)
+  | l == r    = (pid, replace l pid lns)
+  | otherwise = (id, (id, (x, l, r)):lns ++ rns)
+  where (l, lns) = buildROBDD' (restrict e x False) (2 * id) (Just id) xs
+        (r, rns) = buildROBDD' (restrict e x True) (2 * id + 1) (Just id) xs 
+buildROBDD' _ _ _ _
   = undefined
+
+{-
+buildROBDD :: BExp -> [Index] -> BDD
+buildROBDD e xs
+  = fst (buildROBDD' e 2 Nothing [] xs)
+
+buildROBDD' :: BExp -> NodeId -> Maybe NodeId -> [BDD] -> [Index] -> (BDD, [BDD])
+-- buildROBDD' e nid pid [] xs | trace (show nid ++ " ") False = undefined
+buildROBDD' (Prim False) _ _ _ []
+  = ((0, []), [])
+buildROBDD' (Prim True) _ _ _ []
+  = ((1, []), [])
+buildROBDD' e id Nothing ts (x:xs)
+  = ((id, (id, (x, l, r)):lns ++ rns), lt: rt: alts ++ arts)
+    where (lt@(l, lns), alts) = buildROBDD' (restrict e x False) (2 * id) (Just id) ts xs
+          (rt@(r, rns), arts) = buildROBDD' (restrict e x True) (2 * id + 1) (Just id) (alts ++ ts) xs 
+buildROBDD' e id (Just pid) ts (x:xs)
+  | l == r    = ((pid, replace l pid lns), lt: alts)
+  | otherwise = case lookup lns (map swap ts) of
+                                   Just nid -> ((pid, replace l pid (lookUp nid ts)), rt: arts)
+                                   Nothing  -> case lookup rns (map swap ts) of
+                                                 Just nid -> ((pid, replace r pid (lookUp nid ts)), lt: alts)
+                                                 Nothing -> ((id, (id, (x, l, r)):lns ++ rns), lt: rt: alts ++ arts)
+  where (lt@(l, lns), alts) = buildROBDD' (restrict e x False) (2 * id) (Just id) ts xs
+        (rt@(r, rns), arts) = buildROBDD' (restrict e x True) (2 * id + 1) (Just id) (alts ++ ts) xs 
+buildROBDD' _ _ _ _ _
+  = undefined
+-}
+replace :: NodeId -> NodeId -> [BDDNode] -> [BDDNode]
+replace oid nid
+  = map (\(id, v) -> if id == oid then (nid, v) else (id, v))
 
 ------------------------------------------------------
 -- Examples for testing...
