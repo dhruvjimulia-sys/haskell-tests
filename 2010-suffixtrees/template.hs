@@ -1,3 +1,5 @@
+-- Unimplemented function: longestRepeatedSubstring
+
 import Data.List
 import Data.Maybe
 
@@ -54,11 +56,6 @@ getIndices (Leaf i)
 getIndices (Node xs)
   = concatMap (getIndices . snd) xs
 
-{-
-data SuffixTree = Leaf Int | Node [(String, SuffixTree)]
-                deriving (Eq, Show)
--}
-
 partition' :: Eq a => [a] -> [a] -> ([a], [a], [a])
 partition' w w'
   = (p, sw, drop l w')
@@ -101,8 +98,8 @@ buildTree s
 ------------------------------------------------------
 -- Part IV
 
-longestRepeatedSubstring :: SuffixTree -> String
-longestRepeatedSubstring
+longestRepeatedSubstring :: SuffixTree -> Maybe String
+longestRepeatedSubstring t
   = undefined
 
 ------------------------------------------------------
