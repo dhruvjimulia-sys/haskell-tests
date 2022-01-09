@@ -1,5 +1,7 @@
 module Alloc where
 
+-- Unimplemented functions: liveVars
+
 import Data.Maybe
 import Data.List
 import Data.Tuple
@@ -110,17 +112,6 @@ liveVars c
 converge :: (a -> a -> Bool) -> [a] -> a
 converge f xs
   = (fst . head) $ dropWhile (not . snd) (zipWith (\x y -> (x, f x y)) xs (tail xs))
-
-{-
-type Function = (Id, [Id], Block)
-data Statement = Assign Id Exp |
-                 If Exp Block Block |
-                 While Exp Block
-               deriving (Eq, Show)
-
-type Block = [Statement]
-
--}
 
 buildCFG :: Function -> CFG
 buildCFG (_, as, b)
