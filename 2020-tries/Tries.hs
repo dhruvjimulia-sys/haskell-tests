@@ -1,5 +1,7 @@
 module Tries where
 
+-- All functions implemeneted
+
 import Data.List hiding (insert)
 import Data.Bits
 import Data.Maybe

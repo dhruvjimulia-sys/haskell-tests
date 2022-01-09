@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+-- Unimplemented functions: expandXSL' for-each
+
 module Exam where
 
 import Data.Char

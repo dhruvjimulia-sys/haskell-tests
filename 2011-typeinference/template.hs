@@ -1,3 +1,6 @@
+
+-- Unimplemented functions: App rule and Cond rule
+
 import Data.Maybe
 
 data Expr = Number Int |

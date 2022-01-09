@@ -1,3 +1,5 @@
+-- Unimplemented function: buildLTS
+
 import Data.List
 import Data.Maybe
 
@@ -50,10 +52,7 @@ actions (Prefix i p)
   = i : actions p
 actions (Choice ps)
   = concatMap actions ps
-{-
-data Process = STOP | Ref Id | Prefix Id Process | Choice [Process] 
-             deriving (Eq, Show)
--}
+
 accepts :: [Id] -> [ProcessDef] -> Bool
 --Pre: The first item in the list of process definitions is
 --     that of the start process.

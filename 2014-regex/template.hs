@@ -1,3 +1,5 @@
+-- All functions implemented\
+
 import Data.Maybe
 import Data.List
 

@@ -1,3 +1,5 @@
+-- Unimplemented functions: Second ROBDD optimization
+
 import Data.List
 import Data.Maybe
 import Debug.Trace
@@ -93,15 +95,6 @@ buildBDD' e id (x:xs)
   where (l, lns) = buildBDD' (restrict e x False) (2 * id) xs
         (r, rns) = buildBDD' (restrict e x True) (2 * id + 1) xs 
 
-{-
-type Index = Int
-data BExp = Prim Bool | IdRef Index | Not BExp | And BExp BExp | Or BExp BExp
-            deriving (Eq, Ord, Show)
-type Env = [(Index, Bool)]
-type NodeId = Int
-type BDDNode =  (NodeId, (Index, NodeId, NodeId))
-type BDD = (NodeId, [BDDNode])
--}
 ------------------------------------------------------
 -- PART IV
 
@@ -156,6 +149,7 @@ buildROBDD' e id (Just pid) ts (x:xs)
 buildROBDD' _ _ _ _ _
   = undefined
 -}
+
 replace :: NodeId -> NodeId -> [BDDNode] -> [BDDNode]
 replace oid nid
   = map (\(id, v) -> if id == oid then (nid, v) else (id, v))
