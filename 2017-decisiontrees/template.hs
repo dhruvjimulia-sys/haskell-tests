@@ -117,22 +117,6 @@ buildTree d@(h, rs) ca s
 -- PART IV
 --------------------------------------------------------------------
 
-{-
-remove :: Eq a => a -> [(a, b)] -> [(a, b)]
-lookUpAtt :: AttName -> Header -> Row -> AttValue
-removeAtt :: AttName -> Header -> Row -> Row
-addToMapping :: Eq a => (a, b) -> [(a, [b])] -> [(a, [b])]
-type Partition = [(AttValue, DataSet)]
-type Attribute = (AttName, [AttValue])
-type Header = [Attribute]
-type Row = [AttValue]
-type DataSet = (Header, [Row])
-data DecisionTree = Null |
-                    Leaf AttValue |
-                    Node AttName [(AttValue, DecisionTree)]
-                  deriving (Eq, Show)
-type Partition = [(AttValue, DataSet)]
--}
 entropy :: DataSet -> Attribute -> Double
 entropy (_, []) a
   = 0
@@ -140,13 +124,11 @@ entropy ds@(_, rs) a
   = sum (map (\(_, i) -> - xlogx (fromIntegral i / fromIntegral n)) (buildFrequencyTable a ds))
   where n = length rs
 
-a = lookUpAtt
-
 gain :: DataSet -> Attribute -> Attribute -> Double
 gain ds@(_, rs) a@(n, vs) ca
   = entropy ds ca - sum (zipWith (\v@(_, i) (_, p) -> fromIntegral i / fromIntegral n * entropy p ca) (buildFrequencyTable a ds) (partitionData ds a))
   where n = length rs
---type AttSelector = DataSet -> Attribute -> Attribute
+  
 bestGainAtt :: AttSelector
 bestGainAtt ds@(h, rs) ca@(n, vs)
   = snd $ maximum $ map (\a -> (gain ds a ca, a)) (delete ca h)
