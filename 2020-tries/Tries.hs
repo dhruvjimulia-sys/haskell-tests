@@ -3,11 +3,10 @@ module Tries where
 import Data.List hiding (insert)
 import Data.Bits
 import Data.Maybe
-import Debug.Trace
 
--- import Types
--- import HashFunctions
--- import Examples
+import Types
+import HashFunctions
+import Examples
 --------------------------------------------------------------------
 -- Part I
 
@@ -89,15 +88,6 @@ member v h t b
           where i = getIndex h l b
                 n = countOnesFrom i bv
 
-{-
-type BitVector = Int
-data Trie = Leaf [Int] | Node BitVector [SubNode]
-          deriving (Eq, Show)
-data SubNode = Term Int | SubTrie Trie
-             deriving (Eq, Show)
-type Hash = Int
-type HashFun = Int -> Hash
--}
 --------------------------------------------------------------------
 -- Part III
 
@@ -121,113 +111,3 @@ insert f d b v t
 buildTrie :: HashFun -> Int -> Int -> [Int] -> Trie
 buildTrie f d b
   = foldl' (flip (insert f d b)) empty
-
-
-type BitVector = Int
-
-data Trie = Leaf [Int] | Node BitVector [SubNode]
-          deriving (Eq, Show)
-
-data SubNode = Term Int | SubTrie Trie
-             deriving (Eq, Show)
-
-type Hash = Int
-
-type HashFun = Int -> Hash
-
-empty :: Trie
-empty
-  = Node 0 []
-
------------------------------------------------------------------
--- Show function for trees
-
--- Only needed for displaying bit vectors...
-maxDegree :: Int
-maxDegree
-  = 16
-
-showBitVector :: Int -> Int -> String
-showBitVector bv 0
-  = ""
-showBitVector bv n
-  = showBitVector (bv `div` 2) (n - 1) ++ show (bv `mod` 2)
-
-showT :: Trie -> IO ()
-showT t
-  = showT' t 0
-
-showT' :: Trie -> Int -> IO ()
-showT' (Leaf vs) indent
-  = do
-      putStr (replicate indent ' ')
-      putStrLn ("  " ++ show vs)
-showT' (Node bv ts) indent
-  = do
-      putStrLn (replicate indent ' ' ++ showBitVector bv maxDegree)
-      mapM_ (`showT''` (indent + 2)) ts
-
-showT'' (Term v) indent
-  = putStrLn (replicate indent ' ' ++ "<" ++ show v ++ ">")
-showT'' (SubTrie t) indent
-  = showT' t indent
-
-
---
--- Figure 2 (left)
---
-figure :: Trie
-figure
-  = Node 16960 [Term 1830,
-                SubTrie (Node 8208 [Term 73,
-                                    SubTrie (Leaf [729,2521])]),
-                Term 206]
-
---
--- Figure 2 (right)
---
-figureHashed :: Trie
-figureHashed
-  = Node 16481 [Term 2521,
-                Term 206,
-                Term 729,
-                SubTrie (Node 48 [Term 73,
-                                  Term 1830])]
-
---
--- Test tries for insert from the spec
---
-insT1, insT2, insT3, insT4 :: Trie
-insT1
-  = Node 512 [Term 2521]
-insT2
-  = Node 576 [Term 1830,
-              Term 2521]
-insT3
-  = Node 576 [Term 1830,
-              SubTrie (Node 8192 [SubTrie (Leaf [729,2521])])]
-
-insT4
-  = Node 97 [Term 2521,
-             Term 206,
-             Term 729]
-
---
--- Test tries for build from the spec
---
-buildT1, buildT2 :: Trie
-buildT1
-  = Node 14 [Term 1,
-             Term 2,
-             Term 3]
-buildT2
-  = Node 1 [SubTrie (Node 1 [SubTrie (Leaf [256,512,768,
-                                            1024,1280])])]
-
-hash :: HashFun
-hash x
-  = op x''
-  where
-    op x = xor (shiftR x 16) x
-    x'  = op x * 73244475
-    x'' = op x' * 73244475
