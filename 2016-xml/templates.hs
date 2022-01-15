@@ -10,7 +10,7 @@ type Name = String
 
 type Attributes = [(Name, String)]
 
-data XML = Null | Text String | Element Name Attributes [XML]
+data XML = Text String | Element Name Attributes [XML]
          deriving (Eq, Show)
 
 type Stack = [XML]
@@ -60,9 +60,7 @@ getAttribute _ _
 
 getChildren :: String -> XML -> [XML]
 getChildren s (Element _ _ cs)
-  = [c | c <- cs, case c of
-    (Element s _ _) -> True
-    _ -> False]
+  = [c | c@(Element s' _ _) <- cs, s == s']
 getChildren _ _
   = []
 
@@ -70,7 +68,8 @@ getChild :: String -> XML -> XML
 getChild s x
   | null cs   = Text ""
   | otherwise = head cs
-  where cs = getChildren s x
+  where
+    cs = getChildren s x
 
 addChild :: XML -> XML -> XML
 -- Pre: the second argument is an Element
@@ -116,10 +115,11 @@ parseAttributes :: String -> (Attributes, String)
 parseAttributes s
   | h == '>'  = ([], r)
   | otherwise = ((n, a) : as, r''')
-  where (as, r''') = parseAttributes (tail r'')
-        (a, r'')   = span (/='\"') (tail $ dropWhile (/='\"') (skipSpace r'))
-        (n, r')    = parseName ss
-        ss@(h:r)   = skipSpace s
+  where
+    (as, r''') = parseAttributes (tail r'')
+    (a, r'')   = span (/='\"') (tail $ dropWhile (/='\"') (skipSpace r'))
+    (n, r')    = parseName ss
+    ss@(h:r)   = skipSpace s
 
 parse :: String -> XML
 -- Pre: The XML string is well-formed
@@ -127,17 +127,19 @@ parse s
   = parse' (skipSpace s) [sentinel]
 
 parse' :: String -> Stack -> XML
-parse' [] [Element _ _ (c:cs)]
+parse' [] [Element _ _ (c:_)]
   = c
 parse' ('<':'/':xs) s
   = parse' (tail $ dropWhile (/='>') xs) (popAndAdd s)
 parse' ('<':xs) s
   = parse' r' (Element n as [] : s)
-  where (as, r') = parseAttributes (skipSpace r)
-        (n, r) = parseName xs
+  where
+    (as, r') = parseAttributes (skipSpace r)
+    (n, r) = parseName xs
 parse' xs s
   = parse' r (addText t s)
-  where (t, r) = span (/='<') xs
+  where
+    (t, r) = span (/='<') xs
 
 -------------------------------------------------------------------------
 -- Part III
@@ -169,8 +171,9 @@ expandXSL' xml@(Element c as cs) (Element "for-each" [("select", xs)] fc)
   | null a    = concatMap (`expandXSL'` fc) chs
   | null chs  = [Text ""]
   | otherwise = concatMap (\(Element _ as' cs') -> expandXSL' (Element (c ++ b ++ "/") as' cs') (Element "for-each" [("select", tail a)] fc)) chs
-  where chs     = getChildren b xml
-        (b, a) = span (/='/') xs
+  where
+    chs    = getChildren b xml
+    (b, a) = span (/='/') xs
 expandXSL' xml@(Element c as cs) (Element "value-of" [("select", '@':xs)] []) 
   = [maybe (Text "") Text (lookup xs as)]
 expandXSL' xml@(Element c as cs) (Element "value-of" [("select", xs)] []) 
@@ -179,9 +182,10 @@ expandXSL' xml@(Element c as cs) (Element "value-of" [("select", xs)] [])
   | null a             = [getValue ch]
   | ch == Text ""      = [Text ""]
   | otherwise          = expandXSL' (Element (c ++ b ++ "/") as' cs') (Element "value-of" [("select", tail a)] []) 
-  where Element _ as' cs' = ch
-        ch     = getChild b xml
-        (b, a) = span (/='/') xs
+  where
+    Element _ as' cs' = ch
+    ch                = getChild b xml
+    (b, a)            = span (/='/') xs
 expandXSL' xml xsl@(Element n as' cs')
   = map (Element n as') (map (expandXSL' xml) cs')
 expandXSL' xml (Text s)
